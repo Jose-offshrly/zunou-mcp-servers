@@ -67,7 +67,7 @@ proxy = FastMCPProxy(
 )
 
 # Run
-port = os.environ.get("PORT", 8080)
+port = os.environ.get("PORT", 10000)
 if __name__ == "__main__":
     proxy.run(
         transport="http",
