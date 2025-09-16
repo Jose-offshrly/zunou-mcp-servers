@@ -1,9 +1,11 @@
-from fastmcp import FastMCP
-from fastmcp.server.proxy import FastMCPProxy, ProxyClient
-from fastmcp.server.dependencies import get_http_headers
+"""
+Jira MCP client factory module
+Handles dynamic creation of Jira/Atlassian MCP clients based on HTTP headers
+"""
+
+from fastmcp.server.proxy import ProxyClient
 from fastmcp.client.transports import StdioTransport
 from fastmcp.utilities.logging import get_logger
-import os
 
 logger = get_logger(__name__)
 
@@ -17,6 +19,7 @@ def create_dynamic_jira_client_factory():
     def client_factory():
         try:
             # Get HTTP headers from the current request
+            from fastmcp.server.dependencies import get_http_headers
             headers = get_http_headers()
             
             # Extract Jira/Atlassian environment variables from headers
@@ -77,22 +80,7 @@ def create_dynamic_jira_client_factory():
                 return None
                 
         except Exception as e:
-            logger.error(f"Error in client factory: {e}")
+            logger.error(f"Error in Jira client factory: {e}")
             return None
     
     return client_factory
-
-# Create proxy with custom client factory for dynamic environment variables
-proxy = FastMCPProxy(
-    client_factory=create_dynamic_jira_client_factory(),
-    name="Zunou MCP Servers - Jira"
-)
-
-# Run
-port = os.environ.get("PORT", 10000)
-if __name__ == "__main__":
-    proxy.run(
-        transport="http",
-        host="0.0.0.0",  # Bind to all interfaces
-        port=port         # Choose your preferred port
-    )
