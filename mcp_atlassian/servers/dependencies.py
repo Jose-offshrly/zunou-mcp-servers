@@ -237,6 +237,75 @@ async def get_jira_fetcher(ctx: Context) -> JiraFetcher:
             logger.debug(
                 f"get_jira_fetcher: No user-specific JiraFetcher. Auth type: {user_auth_type}. Token present: {hasattr(request.state, 'user_atlassian_token')}. Will use global fallback."
             )
+
+        # Header-based Jira configuration (Basic or PAT) per request
+        try:
+            headers = request.headers
+            hdr_url = headers.get("x-jira-url")
+            hdr_username = headers.get("x-jira-username")
+            hdr_api_token = headers.get("x-jira-api-token")
+            hdr_pat = headers.get("x-jira-personal-token")
+
+            if hdr_url and (hdr_pat or (hdr_username and hdr_api_token)):
+                # Prefer inheriting SSL/proxy settings from global config if available
+                lifespan_ctx_dict = ctx.request_context.lifespan_context  # type: ignore
+                app_lifespan_ctx: MainAppContext | None = (
+                    lifespan_ctx_dict.get("app_lifespan_context")
+                    if isinstance(lifespan_ctx_dict, dict)
+                    else None
+                )
+                base_cfg = getattr(app_lifespan_ctx, "full_jira_config", None)
+
+                ssl_verify = True if base_cfg is None else base_cfg.ssl_verify
+                http_proxy = None if base_cfg is None else base_cfg.http_proxy
+                https_proxy = None if base_cfg is None else base_cfg.https_proxy
+                no_proxy = None if base_cfg is None else base_cfg.no_proxy
+                socks_proxy = None if base_cfg is None else base_cfg.socks_proxy
+                projects_filter = None if base_cfg is None else base_cfg.projects_filter
+
+                if hdr_pat:
+                    auth_type = "pat"
+                    config = JiraConfig(
+                        url=hdr_url,
+                        auth_type=auth_type,
+                        username=None,
+                        api_token=None,
+                        personal_token=hdr_pat,
+                        oauth_config=None,
+                        ssl_verify=ssl_verify,
+                        projects_filter=projects_filter,
+                        http_proxy=http_proxy,
+                        https_proxy=https_proxy,
+                        no_proxy=no_proxy,
+                        socks_proxy=socks_proxy,
+                    )
+                else:
+                    auth_type = "basic"
+                    config = JiraConfig(
+                        url=hdr_url,
+                        auth_type=auth_type,
+                        username=hdr_username,
+                        api_token=hdr_api_token,
+                        personal_token=None,
+                        oauth_config=None,
+                        ssl_verify=ssl_verify,
+                        projects_filter=projects_filter,
+                        http_proxy=http_proxy,
+                        https_proxy=https_proxy,
+                        no_proxy=no_proxy,
+                        socks_proxy=socks_proxy,
+                    )
+
+                logger.info(
+                    f"Creating JiraFetcher from headers (auth_type={auth_type}) for url={hdr_url}"
+                )
+                request.state.jira_fetcher = JiraFetcher(config=config)
+                return request.state.jira_fetcher
+        except Exception as e:
+            logger.error(
+                f"get_jira_fetcher: Failed to create header-based JiraFetcher: {e}",
+                exc_info=True,
+            )
     except RuntimeError:
         logger.debug(
             "Not in an HTTP request context. Attempting global JiraFetcher for non-HTTP."

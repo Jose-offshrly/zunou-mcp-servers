@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from fastmcp.server.proxy import FastMCPProxy
 from fastmcp.utilities.logging import get_logger
 from clients.slack_factory import create_dynamic_slack_client_factory
-from clients.jira_factory import create_dynamic_jira_client_factory
+# from clients.jira_factory import create_dynamic_jira_client_factory
+from mcp_atlassian.servers.jira import jira_mcp
 import os
 
 logger = get_logger(__name__)
@@ -11,11 +12,6 @@ logger = get_logger(__name__)
 slack_mcp = FastMCPProxy(
     client_factory=create_dynamic_slack_client_factory(),
     name="Slack MCP Server"
-)
-
-jira_mcp = FastMCPProxy(
-    client_factory=create_dynamic_jira_client_factory(),
-    name="Jira MCP Server"
 )
 
 slack_app = slack_mcp.http_app()
